@@ -1,4 +1,6 @@
 
+#pragma once
+
 #include <iostream>
 
 // The Lexer returns tokens [0-255] if it is an unknown character, otherwise one of these for known things. 
@@ -16,3 +18,5 @@ enum Token {
 
 static std::string IdentifierStr;   // Filled in if tok_identifier
 static double NumVal;               // Filled in if tok_number
+
+static int gettok();
