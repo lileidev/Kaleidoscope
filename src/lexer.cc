@@ -1,7 +1,7 @@
 #include "include/lexer.h"
 
 // gettok - Return the next token from standard input
-static int gettok() {
+int gettok() {
     static int LastChar = ' ';
 
     // Skip any whitespace.
