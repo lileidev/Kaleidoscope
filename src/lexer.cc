@@ -10,8 +10,8 @@ int gettok() {
     }
 
     if (isalpha(LastChar)) {    // identifier: [a-zA-Z][a-zA-Z0-9]*
-        IdentifierStr += LastChar;
-        while (isalnum((LastChar == getchar()))) {
+        IdentifierStr = LastChar;
+        while (isalnum((LastChar = getchar()))) {
             IdentifierStr += LastChar;
         }
 
@@ -32,7 +32,7 @@ int gettok() {
             LastChar = getchar();
         } while (isdigit(LastChar) || LastChar == '.');
 
-        NumVal = strtod(NumStr.c_str(), 0);
+        NumVal = strtod(NumStr.c_str(), nullptr);
         return tok_number;
     }
 
