@@ -1,10 +1,22 @@
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Verifier.h"
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 //===----------------------------------------------------------------------===//
@@ -89,6 +101,8 @@ namespace {
 class ExprAST {
 public:
   virtual ~ExprAST() = default;
+
+  virtual Value *codegen() = 0;
 };
 
 /// NumberExprAST - Expression class for numeric literals like "1.0".
@@ -97,6 +111,8 @@ class NumberExprAST : public ExprAST {
 
 public:
   NumberExprAST(double Val) : Val(Val) {}
+
+  Value *codegen() override;
 };
 
 /// VariableExprAST - Expression class for referencing a variable, like "a".
@@ -105,6 +121,8 @@ class VariableExprAST : public ExprAST {
 
 public:
   VariableExprAST(const std::string &Name) : Name(Name) {}
+
+  Value *codegen() override;
 };
 
 /// BinaryExprAST - Expression class for a binary operator.
@@ -116,6 +134,8 @@ public:
   BinaryExprAST(char Op, std::unique_ptr<ExprAST> LHS,
                 std::unique_ptr<ExprAST> RHS)
       : Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+
+  Value *codegen() override;
 };
 
 /// CallExprAST - Expression class for function calls.
@@ -127,6 +147,8 @@ public:
   CallExprAST(const std::string &Callee,
               std::vector<std::unique_ptr<ExprAST>> Args)
       : Callee(Callee), Args(std::move(Args)) {}
+
+  Value *codegen() override;
 };
 
 /// PrototypeAST - This class represents the "prototype" for a function,
@@ -140,6 +162,7 @@ public:
   PrototypeAST(const std::string &Name, std::vector<std::string> Args)
       : Name(Name), Args(std::move(Args)) {}
 
+  Function *codegen();
   const std::string &getName() const { return Name; }
 };
 
@@ -152,6 +175,8 @@ public:
   FunctionAST(std::unique_ptr<PrototypeAST> Proto,
               std::unique_ptr<ExprAST> Body)
       : Proto(std::move(Proto)), Body(std::move(Body)) {}
+  
+  Function *codegen();
 };
 
 } // end anonymous namespace
@@ -366,6 +391,32 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 static std::unique_ptr<PrototypeAST> ParseExtern() {
   getNextToken(); // eat extern.
   return ParsePrototype();
+}
+
+// Code Generation
+
+static std::unique_ptr<std::llvm::LLVMContext> TheContext;
+static std::unique_ptr<Module> TheModule;
+static std::unique_ptr<std::llvm::IRBuilder<>> Builder;
+static std::map<std::string, Value *> NameValues;
+
+Value *LogErrorV(const char *Str) {
+  LogError(Str);
+  return nullptr;
+}
+
+Value *NumberExprAST::codegen() {
+  return std::llvm::ConstantFP::get(*TheContext, APFloat(Val));
+}
+
+Value *VariableExprAST::codegen() {
+  // Look this variable up in the function.
+  Value *V = NameValues[Name];
+  if (!V) {
+    return LogErrorV("Unknown variable name");
+  }
+
+  return V;
 }
 
 //===----------------------------------------------------------------------===//
